@@ -1,0 +1,7 @@
+.vscode
+dist
+dist-newstyle
+CHANGELOG*
+report.html
+*.save*
+build
