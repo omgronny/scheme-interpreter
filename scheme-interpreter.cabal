@@ -8,6 +8,8 @@ extra-source-files: CHANGELOG.md
 library
     exposed-modules:
         Cli
+        Parser
+        Types
 
     hs-source-dirs:   src
     other-modules:    Paths_scheme_interpreter
@@ -18,9 +20,13 @@ library
         -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
 
     build-depends:
-        base >=4.7 && <5,
-        text,
-        cmdargs
+        base >=4.7 && <5
+        , text
+        , cmdargs
+        , parsec >=3.1
+        , parsec-numbers
+        , haskeline >=0.7
+        , containers >=0.5
 
 executable scheme-interpreter-exe
     main-is:          Main.hs
@@ -34,9 +40,13 @@ executable scheme-interpreter-exe
         -threaded -rtsopts -with-rtsopts=-N
 
     build-depends:
-        base >=4.7 && <5,
-        scheme-interpreter,
-        text
+        base >=4.7 && <5
+        , scheme-interpreter
+        , text
+        , parsec >=3.1
+        , parsec-numbers
+        , haskeline >=0.7
+        , containers >=0.5
 
 test-suite scheme-interpreter-test
     type:             exitcode-stdio-1.0
@@ -51,7 +61,11 @@ test-suite scheme-interpreter-test
         -threaded -rtsopts -with-rtsopts=-N
 
     build-depends:
-        QuickCheck,
-        HUnit,
-        base >=4.7 && <5,
-        scheme-interpreter
+        QuickCheck
+        , HUnit
+        , base >=4.7 && <5
+        , scheme-interpreter
+        , parsec >=3.1
+        , parsec-numbers
+        , haskeline >=0.7
+        , containers >=0.5
