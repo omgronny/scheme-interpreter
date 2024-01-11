@@ -10,6 +10,7 @@ library
         Cli
         Parser
         Types
+        Evaluator
 
     hs-source-dirs:   src
     other-modules:    Paths_scheme_interpreter

@@ -1,4 +1,5 @@
 module Types (
+    Variables,
     Expression(
         Number,
         Boolean,
@@ -7,12 +8,13 @@ module Types (
         String,
         Quote,
         List),
-    Form (FExpr),
-    Program (Program),
+    -- Form (FExpr),
+    -- Program (Program),
+    initVars,
   ) where
 
 import qualified Data.List as L
-import Data.Map()
+import Data.Map hiding (map)
 
 --------------------------------------------------------------------------------
 
@@ -25,20 +27,27 @@ data Expression = Number Double
                 | List [Expression]
                   deriving (Eq, Ord)
 
+isInt x = x == fromInteger (round x)
+
 instance Show Expression where
-  show (Number n) = "Number " ++ show n
-  show (String s) = "String " ++ show s
-  show (Boolean b) = "Boolean " ++ if b then "true" else "false"
-  show (Symbol s) = "Symbol " ++ show s
+  show (Number n) = if isInt n then show (round n) else show n
+  show (String s) = show s
+  show (Boolean b) = if b then "#t" else "#f"
+  show (Symbol s) = show s
   show (Quote e) = "'" ++ show e
-  show (List exprs) = "List " ++ "(" ++ L.unwords (map show exprs) ++ ")"
-  show (Operator c) = "Operator " ++ show c
+  show (List exprs) = "(" ++ L.unwords (map show exprs) ++ ")"
+  show (Operator c) = show c
 
 --------------------------------------------------------------------------------
 
-data Form = FExpr Expression
-  deriving (Eq, Show)
+type Variables = Map String Expression
 
-data Program = Program [Form]
+initVars :: Variables
+initVars = fromList []
+
+-- data Form = FExpr Expression
+--   deriving (Eq, Show)
+
+-- data Program = Program [Form]
 
 

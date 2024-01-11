@@ -38,8 +38,8 @@ closedParens = do
 
 readNumber = rd <$> (plus' <|> minus <|> number)
     where
-        rd   = read :: String -> Double
-        plus'   = char '+' *> number
+        rd     = read :: String -> Double
+        plus'  = char '+' *> number
         minus  = (:) <$> char '-' <*> number
         number = many1 digit
 
@@ -74,6 +74,7 @@ pOperator = do
               , try (string "*")
               , try (string "/")
               , try (string "-")
+              , try (string "=")
               , try (string ">=")
               , try (string "<=")
               , try (string ">")
@@ -114,10 +115,10 @@ pExpression =
   <|> try pQuote
   <|> try pList
 
-pExpr :: Parser Form
+pExpr :: Parser Expression
 pExpr = do
   expr <- pExpression
-  return $ FExpr expr
+  return $ expr
 
-pForm :: Parser Form
+pForm :: Parser Expression
 pForm = try pExpr
