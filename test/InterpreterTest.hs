@@ -40,7 +40,8 @@ tests =
         TestLabel "linear: test list order" test4,
         TestLabel "linear: test list bool func" test5,
         TestLabel "linear: test define" test6,
-        TestLabel "linear: test laziness" test7
+        TestLabel "linear: test laziness" test7,
+        TestLabel "linear: test quote" test8
     ]
 
 test1 :: Test
@@ -170,5 +171,15 @@ test7 =
         vars <- checkEquals vars "(and #f (set! x 2))" "#f"
         vars <- checkEquals vars "x" "1"
 
+        return ()
+    )
+
+test8 :: Test
+test8 =
+  TestCase
+    ( do
+        checkEquals initVars "'(1 2)" "(1 2)"
+
+        checkEquals initVars "'(f g)" "(\"f\" \"g\")"
         return ()
     )

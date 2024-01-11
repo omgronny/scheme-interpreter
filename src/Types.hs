@@ -8,8 +8,6 @@ module Types (
         String,
         Quote,
         List),
-    -- Form (FExpr),
-    -- Program (Program),
     initVars,
   ) where
 
@@ -34,7 +32,7 @@ instance Show Expression where
   show (String s) = show s
   show (Boolean b) = if b then "#t" else "#f"
   show (Symbol s) = show s
-  show (Quote e) = "'" ++ show e
+  show (Quote e) = show e
   show (List exprs) = "(" ++ L.unwords (map show exprs) ++ ")"
   show (Operator c) = show c
 
@@ -44,10 +42,5 @@ type Variables = Map String Expression
 
 initVars :: Variables
 initVars = fromList []
-
--- data Form = FExpr Expression
---   deriving (Eq, Show)
-
--- data Program = Program [Form]
 
 

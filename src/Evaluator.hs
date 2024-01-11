@@ -67,7 +67,7 @@ eval v (Boolean bool) = (v, Just (Boolean bool))
 eval v (Operator _) = (v, Nothing) -- operator itself is an error
 eval v (Symbol smb) = (v, Data.Map.lookup smb v)
 
-eval v (Quote _) = (v, Nothing) -- TODO
+eval v (Quote q) = (v, Just q)
 
 eval v (List []) = (v, Just (List []))
 eval vars (List list) = do
