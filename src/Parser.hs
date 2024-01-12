@@ -1,12 +1,12 @@
 module Parser where
 
-import Types
-import Text.Parsec.Char (spaces)
-import Text.Parsec.String (Parser)
-import Text.Parsec (anyChar, endOfLine, parse, char, digit, string, noneOf, try, sepBy, (<|>))
-import Text.Parsec.Combinator (choice, many1, manyTill)
 import Control.Applicative (many)
 import Control.Monad (void)
+import Text.Parsec (anyChar, char, digit, endOfLine, noneOf, parse, sepBy, string, try, (<|>))
+import Text.Parsec.Char (spaces)
+import Text.Parsec.Combinator (choice, many1, manyTill)
+import Text.Parsec.String (Parser)
+import Types
 
 --------------------------------------------------------------------------------
 
@@ -37,57 +37,64 @@ closedParens = do
 --------------------------------------------------------------------------------
 
 readNumber = rd <$> (plus' <|> minus <|> number)
-    where
-        rd     = read :: String -> Double
-        plus'  = char '+' *> number
-        minus  = (:) <$> char '-' <*> number
-        number = many1 digit
+  where
+    rd = read :: String -> Double
+    plus' = char '+' *> number
+    minus = (:) <$> char '-' <*> number
+    number = many1 digit
 
 pNumber :: Parser Expression
 pNumber = do
-    void separator
-    num <- readNumber
-    void separator
-    return $ Number $ num
+  void separator
+  num <- readNumber
+  void separator
+  return $ Number $ num
 
 pBoolean :: Parser Expression
-pBoolean = do
-  void separator
-  try (do
-    string "#t"
-    return $ Boolean True)
-  <|>
-  try (do
-    string "#f"
-    return $ Boolean False)
+pBoolean =
+  do
+    void separator
+    try
+      ( do
+          string "#t"
+          return $ Boolean True
+      )
+    <|> try
+      ( do
+          string "#f"
+          return $ Boolean False
+      )
 
 pString :: Parser Expression
 pString = do
-    void $ char '"'
-    str <- many $ noneOf "\""
-    void $ char '"'
-    return $ String str
+  void $ char '"'
+  str <- many $ noneOf "\""
+  void $ char '"'
+  return $ String str
 
 pOperator :: Parser Expression
 pOperator = do
-    o <- choice [ try (string "+")
-              , try (string "*")
-              , try (string "/")
-              , try (string "-")
-              , try (string "=")
-              , try (string ">=")
-              , try (string "<=")
-              , try (string ">")
-              , try (string "<") ]
-    void separator
-    return $ Operator o
+  o <-
+    choice
+      [ try (string "+"),
+        try (string "*"),
+        try (string "/"),
+        try (string "-"),
+        try (string "="),
+        try (string ">="),
+        try (string "<="),
+        try (string ">"),
+        try (string "<")
+      ]
+  void separator
+  return $ Operator o
 
 pSymbol :: Parser Expression
 pSymbol = do
-    void separator
-    smb <- many1 $ noneOf "\n\t ()'\""
-    void separator
-    return $ Symbol smb
+  void separator
+  smb <- many1 $ noneOf "\n\t ()'\""
+  void separator
+  return $ Symbol smb
 
 pQuote :: Parser Expression
 pQuote = do
@@ -98,22 +105,22 @@ pQuote = do
 
 pList :: Parser Expression
 pList = do
-    void openParens
-    exprs <- many pExpression
-    void closedParens
-    return $ List exprs
+  void openParens
+  exprs <- many pExpression
+  void closedParens
+  return $ List exprs
 
 --------------------------------------------------------------------------------
 
 pExpression :: Parser Expression
 pExpression =
   try pNumber
-  <|> try pString
-  <|> try pBoolean
-  <|> try pOperator
-  <|> try pSymbol
-  <|> try pQuote
-  <|> try pList
+    <|> try pString
+    <|> try pBoolean
+    <|> try pOperator
+    <|> try pSymbol
+    <|> try pQuote
+    <|> try pList
 
 pExpr :: Parser Expression
 pExpr = do

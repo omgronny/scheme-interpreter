@@ -1,31 +1,35 @@
 module Main (main) where
 
 import Cli (parseInput)
-import Parser
+import Control.Monad.IO.Class (liftIO)
+import Data.Maybe (fromMaybe)
 import Evaluator
-import Types
-
+import Parser
+import System.Console.Haskeline
 import Text.Parsec (parse)
 import Text.Printf
-import System.Console.Haskeline
-import Data.Maybe (fromMaybe)
-import Control.Monad.IO.Class (liftIO)
+import Types
 
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
-  doMain initVars
+  runInputT defaultSettings (doMain initVars)
 
+doMain :: Variables -> InputT IO ()
 doMain vars = do
-  print $ "> "
-  input <- getLine
-  let res = parse pForm "(source)" input
-  case res of
-    Left _ -> do
-      print $ "Error!"
-      doMain vars
-    Right form -> do
-      let (vars', value) = eval vars form
-      print $ value
-      doMain vars'
+  input <- getInputLine "> "
+  case input of
+    Nothing -> return ()
+    Just inp -> do
+      let res = parse pForm "(source)" inp
+      case res of
+        Left _ -> do
+          outputStrLn $ printf "Error!"
+          doMain vars
+        Right form -> do
+          let (vars', value) = eval vars form
+          case value of
+            Nothing -> outputStrLn $ printf "Syntax error"
+            Just val -> outputStrLn $ printf "%s" (show val)
+          doMain vars'

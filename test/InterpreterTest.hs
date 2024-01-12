@@ -1,47 +1,50 @@
-import Test.HUnit (Test (..), assertEqual, runTestTTAndExit)
-
-import Parser
 import Evaluator
-import Types
+import Parser
+import Test.HUnit (Test (..), assertEqual, runTestTTAndExit)
 import Text.Parsec (parse)
+import Types
 
 main :: IO ()
 main = runTestTTAndExit tests
 
 evaluateProgram :: Variables -> String -> (Variables, Maybe String)
 evaluateProgram vars input = do
-    case parse pForm "(source)" input of
-        Left _ -> do
-            (vars, Nothing)
-        Right form -> do
-            let (vars', ev) = eval vars form
-            case ev of
-                Nothing -> (vars', Nothing)
-                Just evaluated -> (vars', Just $ show evaluated)
+  case parse pForm "(source)" input of
+    Left _ -> do
+      (vars, Nothing)
+    Right form -> do
+      let (vars', ev) = eval vars form
+      case ev of
+        Nothing -> (vars', Nothing)
+        Just evaluated -> (vars', Just $ show evaluated)
 
 checkEquals :: Variables -> String -> String -> IO Variables
 checkEquals vars input expected = do
-    let (vars', evaluated) = evaluateProgram vars input
-    assertEqual "" (Just expected) evaluated
-    return vars'
+  let (vars', evaluated) = evaluateProgram vars input
+  assertEqual "" (Just expected) evaluated
+  return vars'
 
-checkNothing  :: Variables -> String -> IO Variables
+checkNothing :: Variables -> String -> IO Variables
 checkNothing vars input = do
-    let (vars', evaluated) = evaluateProgram vars input
-    assertEqual "" Nothing evaluated
-    return vars'
+  let (vars', evaluated) = evaluateProgram vars input
+  assertEqual "" Nothing evaluated
+  return vars'
 
 tests :: Test
 tests =
   TestList
     [ TestLabel "linear: test simple number" test1,
-        TestLabel "linear: test simple bool" test2,
-        TestLabel "linear: test list numbers" test3,
-        TestLabel "linear: test list order" test4,
-        TestLabel "linear: test list bool func" test5,
-        TestLabel "linear: test define" test6,
-        TestLabel "linear: test laziness" test7,
-        TestLabel "linear: test quote" test8
+      TestLabel "linear: test simple bool" test2,
+      TestLabel "linear: test list numbers" test3,
+      TestLabel "linear: test list order" test4,
+      TestLabel "linear: test list bool func" test5,
+      TestLabel "linear: test define" test6,
+      TestLabel "linear: test laziness" test7,
+      TestLabel "linear: test quote" test8,
+      TestLabel "linear: test lambda" test9,
+      TestLabel "linear: test car-cdr" test10,
+      TestLabel "linear: test control flow" test11,
+      TestLabel "linear: test recursive" test12
     ]
 
 test1 :: Test
@@ -84,16 +87,16 @@ test3 =
     ( do
         checkEquals initVars "(max 2 1)" "2"
         checkEquals initVars "(max 1 2 5 3 2 1 4)" "5"
-        
+
         checkEquals initVars "(min 38 2 7 8 3 0 7)" "0"
 
         checkEquals initVars "(+ 1 2)" "3"
         checkEquals initVars "(+ 1 2 3 4 5)" "15"
-        
+
         checkEquals initVars "(* 1 2 3)" "6"
 
         checkEquals initVars "(+ 1 (+ 3 4 5))" "13"
-        
+
         checkEquals initVars "(/ 4 2)" "2"
         checkEquals initVars "(/ 4 2 2)" "1"
 
@@ -181,5 +184,87 @@ test8 =
         checkEquals initVars "'(1 2)" "(1 2)"
 
         checkEquals initVars "'(f g)" "(\"f\" \"g\")"
+
+        return ()
+    )
+
+test9 :: Test
+test9 =
+  TestCase
+    ( do
+        let vars = initVars
+        vars <- checkEquals vars "(define test (lambda (x) (+ x 9)))" "lambda"
+        vars <- checkEquals vars "(test 1)" "10"
+        vars <- checkEquals vars "(test -1)" "8"
+        vars <- checkEquals vars "(test 42)" "51"
+
+        let vars = initVars
+        vars <- checkEquals vars "(define test (lambda (x) (set! x (* x 2)) (+ 1 x)))" "lambda"
+        vars <- checkEquals vars "(test 20)" "41"
+
+        let vars = initVars
+        vars <- checkEquals vars "(define add (lambda (x y) (+ x y 1)))" "lambda"
+        vars <- checkEquals vars "(add -10 11)" "2"
+
+        vars <- checkEquals vars "(define zero (lambda () 0))" "lambda"
+        vars <- checkEquals vars "(zero)" "0"
+
+        return ()
+    )
+
+test10 :: Test
+test10 =
+  TestCase
+    ( do
+        let vars = initVars
+
+        vars <- checkEquals vars "(define x '(1 2))" "(1 2)"
+        vars <- checkEquals vars "x" "(1 2)"
+
+        vars <- checkEquals vars "(set-car! x 5)" "5"
+        vars <- checkEquals vars "(car x)" "5"
+
+        vars <- checkEquals vars "(set-cdr! x 6)" "6"
+        vars <- checkEquals vars "(cdr x)" "6"
+
+        vars <- checkEquals vars "x" "(5 6)"
+
+        return ()
+    )
+
+test11 :: Test
+test11 =
+  TestCase
+    ( do
+        let vars = initVars
+
+        vars <- checkEquals vars "(if #t 0 1)" "0"
+        vars <- checkEquals vars "(if #f 0 1)" "1"
+
+        vars <- checkEquals vars "(if (= 2 2) (+ 1 10) 42)" "11"
+        vars <- checkEquals vars "(if (= 2 3) (+ 1 10) 42)" "42"
+
+        vars <- checkEquals vars "(define x 1)" "1"
+        vars <- checkEquals vars "(if #f (set! x 2) 42)" "42"
+        vars <- checkEquals vars "x" "1"
+
+        vars <- checkEquals vars "(if #t (set! x 4) (set! x 3))" "4"
+        vars <- checkEquals vars "x" "4"
+
+        return ()
+    )
+
+test12 :: Test
+test12 =
+  TestCase
+    ( do
+        let vars = initVars
+
+        vars <- checkEquals vars "(define slow-add (lambda (x y) (if (= x 0) y (slow-add (- x 1) (+ y 1)))))" "lambda"
+
+        vars <- checkEquals vars "(slow-add 0 3)" "3"
+        vars <- checkEquals vars "(slow-add 3 3)" "6"
+        vars <- checkEquals vars "(slow-add 100 100)" "200"
+
         return ()
     )
