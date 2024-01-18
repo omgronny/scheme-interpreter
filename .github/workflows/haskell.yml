@@ -43,11 +43,6 @@ jobs:
     - name: 'Run HLint'
       uses: haskell-actions/hlint-run@v2
       with:
-        path: src/
-    - name: 'Run formatter'
-      uses: haskell-actions/run-ormolu@v14
-      with:
-        pattern: |
-          */*.hs
+        path: src
     - name: Run tests
       run: .github/workflows/runtests

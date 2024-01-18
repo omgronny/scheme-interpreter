@@ -1,8 +1,5 @@
 module Main (main) where
 
-import Cli (parseInput)
-import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (fromMaybe)
 import Evaluator
 import Parser
 import System.Console.Haskeline

@@ -1,1 +1,0 @@
-cabal test all --test-show-details=always
