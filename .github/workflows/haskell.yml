@@ -45,4 +45,4 @@ jobs:
       with:
         path: src
     - name: Run tests
-      run: .github/workflows/runtests
+      run: cabal test all --test-show-details=always
