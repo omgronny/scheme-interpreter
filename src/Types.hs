@@ -7,8 +7,7 @@ module Types
         Symbol,
         String,
         Quote,
-        List,
-        Lambda
+        List
       ),
     EvaledExpression
       ( EvaledNumber,
@@ -22,6 +21,8 @@ module Types
       ),
     initVars,
     initVar,
+    getExpr,
+    getEvaledExpr
   )
 where
 
@@ -38,7 +39,6 @@ data Expression
   | String String
   | Quote Expression
   | List [Expression]
-  | Lambda (Expression, [Expression])
   deriving (Eq, Ord)
 
 data EvaledExpression
@@ -63,7 +63,6 @@ instance Show Expression where
   show (Quote e) = show e
   show (List exprs) = "(" ++ L.unwords (map show exprs) ++ ")"
   show (Operator c) = show c
-  show (Lambda _) = "lambda"
 
 instance Show EvaledExpression where
   show (EvaledNumber n) = if isInt n then show (round n) else show n
@@ -75,9 +74,29 @@ instance Show EvaledExpression where
   show (EvaledOperator c) = show c
   show (EvaledLambda _) = "lambda"
 
+
+getEvaledExpr :: Expression -> EvaledExpression
+getEvaledExpr (Number x) = EvaledNumber x
+getEvaledExpr (Symbol x) = EvaledSymbol x
+getEvaledExpr (String x) = EvaledString x
+getEvaledExpr (Quote x) = EvaledQuote x
+getEvaledExpr (List x) = EvaledList x
+getEvaledExpr (Boolean x) = EvaledBoolean x
+getEvaledExpr (Operator x) = EvaledOperator x
+
+getExpr :: EvaledExpression -> Expression
+getExpr (EvaledNumber x) = Number x
+getExpr (EvaledSymbol x) = Symbol x
+getExpr (EvaledString x) = String x
+getExpr (EvaledQuote x) = Quote x
+getExpr (EvaledList x) = List x
+getExpr (EvaledBoolean x) = Boolean x
+getExpr (EvaledOperator x) = Operator x
+getExpr (EvaledLambda _) = error "internal: bad conversion"
+
 --------------------------------------------------------------------------------
 
-type Variables = Map String Expression
+type Variables = Map String EvaledExpression
 
 initVars :: [Variables]
 initVars =  [fromList []]
