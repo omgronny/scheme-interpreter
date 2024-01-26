@@ -84,6 +84,13 @@ evalNot vars (h:_) = do
     let bool = getBool b
     return $ (vars, EvaledBoolean $ not bool)
 
+evalDefine :: [Variables] -> [Expression] -> IO ([Variables], EvaledExpression)
+evalDefine _ [] = error "syntax error: define"
+evalDefine vars (h:hs:_) = do
+    let name = getSymbol $ h
+    (_, evaled) <- eval vars hs
+    return (defineVariable vars name evaled, evaled)
+
 --------------------------------------------------------------------------------
 
 evalLines :: [Variables] -> [Expression] -> IO ([Variables], EvaledExpression)
@@ -138,12 +145,9 @@ doEval vars (List list@(h:hs)) = do
 
         Symbol "lambda" -> return $ (vars, EvaledLambda (h, hs))
 
-        Symbol "define" -> if not $ length hs == 2 then error "" else do
-            let name = getSymbol $ head hs
-            (_, evaled) <- eval vars (hs!!1)
-            return (defineVariable vars name evaled, evaled)
+        Symbol "define" -> evalDefine vars hs
 
-        Symbol "set!" -> if not $ length hs == 2 then error "" else do
+        Symbol "set!" -> if not $ length hs == 2 then error "syntax error: set" else do
             let name = getSymbol $ head hs
 
             case lookupVariable vars name of
