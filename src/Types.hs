@@ -10,7 +10,18 @@ module Types
         List,
         Lambda
       ),
+    EvaledExpression
+      ( EvaledNumber,
+        EvaledBoolean,
+        EvaledOperator,
+        EvaledSymbol,
+        EvaledString,
+        EvaledQuote,
+        EvaledList,
+        EvaledLambda
+      ),
     initVars,
+    initVar,
   )
 where
 
@@ -27,9 +38,21 @@ data Expression
   | String String
   | Quote Expression
   | List [Expression]
-  | Lambda [Expression]
+  | Lambda (Expression, [Expression])
   deriving (Eq, Ord)
 
+data EvaledExpression
+  = EvaledNumber Double
+  | EvaledBoolean Bool
+  | EvaledOperator String
+  | EvaledSymbol String
+  | EvaledString String
+  | EvaledQuote Expression
+  | EvaledList [Expression]
+  | EvaledLambda (Expression, [Expression])
+  deriving (Eq, Ord)
+
+isInt :: RealFrac a => a -> Bool
 isInt x = x == fromInteger (round x)
 
 instance Show Expression where
@@ -42,9 +65,22 @@ instance Show Expression where
   show (Operator c) = show c
   show (Lambda _) = "lambda"
 
+instance Show EvaledExpression where
+  show (EvaledNumber n) = if isInt n then show (round n) else show n
+  show (EvaledString s) = show s
+  show (EvaledBoolean b) = if b then "#t" else "#f"
+  show (EvaledSymbol s) = show s
+  show (EvaledQuote e) = show e
+  show (EvaledList exprs) = "(" ++ L.unwords (map show exprs) ++ ")"
+  show (EvaledOperator c) = show c
+  show (EvaledLambda _) = "lambda"
+
 --------------------------------------------------------------------------------
 
 type Variables = Map String Expression
 
-initVars :: Variables
-initVars = fromList []
+initVars :: [Variables]
+initVars =  [fromList []]
+
+initVar :: Variables
+initVar =  fromList []

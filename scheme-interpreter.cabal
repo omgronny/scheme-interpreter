@@ -9,6 +9,7 @@ library
     exposed-modules:
         Parser
         Types
+        Util
         Evaluator
 
     hs-source-dirs:   src

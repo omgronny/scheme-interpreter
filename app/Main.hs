@@ -6,6 +6,8 @@ import System.Console.Haskeline
 import Text.Parsec (parse)
 import Text.Printf
 import Types
+import Control.Monad.IO.Class
+
 
 --------------------------------------------------------------------------------
 
@@ -13,7 +15,7 @@ main :: IO ()
 main = do
   runInputT defaultSettings (doMain initVars)
 
-doMain :: Variables -> InputT IO ()
+doMain :: [Variables] -> InputT IO ()
 doMain vars = do
   input <- getInputLine "> "
   case input of
@@ -25,8 +27,6 @@ doMain vars = do
           outputStrLn $ printf "Error!"
           doMain vars
         Right form -> do
-          let (vars', value) = eval vars form
-          case value of
-            Nothing -> outputStrLn $ printf "Syntax error"
-            Just val -> outputStrLn $ printf "%s" (show val)
+          (vars', value) <- liftIO $ eval vars form
+          outputStrLn $ printf "%s" (show value)
           doMain vars'

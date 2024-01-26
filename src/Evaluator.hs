@@ -1,241 +1,218 @@
 module Evaluator where
 
 import Types
+import Util
 
 import Data.Map (insert, lookup, delete, fromList)
 
 --------------------------------------------------------------------------------
 
-compareList vars f list = doCompareList f (map (evalAndGetNumber vars) list)
+compareList :: [Variables] -> (Double -> Double -> Bool) -> [Expression] -> IO Bool
+compareList vars f list = do
+    a <- sequence (map (evalAndGetNumber vars) list)
+    return $ doCompareList f a
 
-doCompareList :: (Ord a) => (a -> a -> Bool) -> [a] -> Bool
+doCompareList :: (a -> a -> Bool) -> [a] -> Bool
 doCompareList _ [] = True
-doCompareList f list = Prelude.and $ zipWith f list (tail list)
-
-getSymbol :: Expression -> String
-getSymbol (Symbol str) = str
-getSymbol _ = error "getSymbol on non-string"
-
-getNumber :: Maybe Expression -> Double
-getNumber Nothing = error "getNumber on Nothing"
-getNumber (Just (Number num)) = num
-getNumber (Just _) = error "getNumber on NaN"
-
-maybeGetNumber :: Expression -> Maybe Double
-maybeGetNumber (Number num) = Just num
-maybeGetNumber _ = Nothing
-
-maybeGetBool :: Expression -> Maybe Bool
-maybeGetBool (Boolean bool) = Just bool
-maybeGetBool _ = Nothing
-
-getBoolOr :: Expression -> Bool -> Bool
-getBoolOr (Boolean bool) _ = bool
-getBoolOr _ var = var
-
-fillParamsInFunction :: Variables -> Expression -> [Expression] -> Variables
-fillParamsInFunction oldVars (List []) [] = oldVars
-fillParamsInFunction oldVars (List (n:ns)) (v:vs) = do
-    let (evalVars, evaledV) = eval oldVars v
-    case evaledV of
-        Nothing -> oldVars
-        Just v' -> do
-            let appended = insert (getSymbol n) v' evalVars
-            fillParamsInFunction appended (List ns) vs
-fillParamsInFunction oldVars _ _ = oldVars
-
-evalAndGetNumber :: Variables -> Expression -> Double
-evalAndGetNumber vars = getNumber . snd . eval vars
-
-checkValue checker hs = do
-    if not $ length hs == 1 then Nothing else do
-        let val = checker $ head hs
-        case val of
-            Nothing -> Just $ Boolean False
-            Just _ -> Just $ Boolean True
-
-checkBoolList _ [] _ = Just $ Boolean True
-checkBoolList vars (h:hs) isAnd = do
-    let evaled = snd $ eval vars h
-    case evaled of
-        Nothing -> Nothing
-        Just ev -> do
-            if isAnd
-                then do
-                    let con = getBoolOr ev True
-                    if not con then Just ev else do
-                        if null hs then Just ev else (checkBoolList vars hs isAnd)
-                else do
-                    let con = getBoolOr ev True
-                    if con then Just ev else do
-                        if null hs then Just (Boolean False) else (checkBoolList vars hs isAnd)
+doCompareList _ [_] = True
+doCompareList f list@(_:ls) = Prelude.and $ zipWith f list ls
 
 --------------------------------------------------------------------------------
 
-evalLines :: Variables -> [Expression] -> (Variables, Maybe Expression)
-evalLines vars [] = (vars, Nothing)
+fillParamsInFunction :: [Variables] -> Expression -> [Expression] -> IO [Variables]
+fillParamsInFunction oldVars (List []) [] = return oldVars
+fillParamsInFunction oldVars (List (n:ns)) (v:vs) = do
+    (evalVars, evaledV) <- eval oldVars v
+    let appended = defineVariable evalVars (getSymbol n) evaledV
+    fillParamsInFunction appended (List ns) vs
+fillParamsInFunction oldVars _ _ = return oldVars
+
+--------------------------------------------------------------------------------
+
+evalAndGetNumber :: [Variables] -> Expression -> IO Double
+evalAndGetNumber vars exprIO = do
+    (_, evaled) <- eval vars exprIO
+    return $ getNumber evaled
+
+checkValue :: (a1 -> Maybe a2) -> [a1] -> Expression
+checkValue _ [] = error "internal"
+checkValue checker (h:_) = do
+    let val = checker h
+    case val of
+        Nothing -> Boolean False
+        Just _ -> Boolean True
+
+
+checkBoolList :: [Variables] -> [Expression] -> Bool -> IO ([Variables], Expression)
+checkBoolList v [] _ = return $ (v, Boolean True)
+checkBoolList vars (h:hs) isAnd = do
+    (_, evaled) <- eval vars h
+    if isAnd
+        then do
+            let con = getBoolOr evaled True
+            if not con then return (vars, evaled) else do
+                if null hs then return (vars, evaled) else (checkBoolList vars hs isAnd)
+        else do
+            let con = getBoolOr evaled True
+            if con then return (vars, evaled) else do
+                if null hs then return $ (vars, Boolean False) else (checkBoolList vars hs isAnd)
+
+--------------------------------------------------------------------------------
+
+foldList :: [Variables] -> [Expression] -> (Double -> Double -> Double) -> IO ([Variables], Expression)
+foldList _ [] _ = error "internal error: empty list"
+foldList vars (h:hs) f = do
+    a <- sequence (map (evalAndGetNumber vars) hs)
+    b <- evalAndGetNumber vars h
+    return $ (vars, Number $ foldl f b a)
+
+foldCompareList :: [Variables] -> [Expression] -> (Double -> Double -> Bool) -> IO ([Variables], Expression)
+foldCompareList vars hs f = do
+    a <- compareList vars f hs
+    return $ (vars, Boolean $ a)
+
+--------------------------------------------------------------------------------
+
+evalAbs :: a -> [Expression] -> IO (a, Expression)
+evalAbs _ [] = error "syntax error: abs"
+evalAbs vars (h:_) = return $ (vars, Number $ abs (getNumber h))
+
+evalNot :: a -> [Expression] -> IO (a, Expression)
+evalNot _ [] = error "syntax error: not"
+evalNot vars (h:_) = do
+    let bool = getBool h
+    return $ (vars, Boolean $ not bool)
+
+
+--------------------------------------------------------------------------------
+
+evalLines :: [Variables] -> [Expression] -> IO ([Variables], Expression)
+evalLines _ [] = error "evalLines on empty list"
 evalLines vars [h] = eval vars h
 evalLines vars (l:ls) = do
-    let (vars', _) = eval vars l
+    (vars', _) <- eval vars l
     evalLines vars' ls
 
-eval :: Variables -> Expression -> (Variables, Maybe Expression)
+eval :: [Variables] -> Expression -> IO ([Variables], Expression)
 
-eval v (Number num) = (v, Just (Number num))
-eval v (String str) = (v, Just (String str))
-eval v (Boolean bool) = (v, Just (Boolean bool))
+eval v (Number num) = return $ (v, (Number num))
+eval v (String str) = return $ (v, (String str))
+eval v (Boolean bool) = return $ (v, (Boolean bool))
 
-eval v (Operator _) = (v, Nothing) -- operator itself is an error
-eval v (Lambda _) = (v, Nothing) -- lambda itself is an error
+eval _ (Operator _) = error "operator error" -- operator itself is an error
+eval _ (Lambda _) = error "internal lambda error" -- lambda itself is an error
 
-eval v (Symbol smb) = (v, Data.Map.lookup smb v)
+eval v (Symbol smb) = return $ (v, case lookupVariable v smb of
+    Nothing -> error "unknown name"
+    Just var -> var)
 
-eval v (Quote q) = (v, Just q)
+eval v (Quote q) = return $ (v, q)
 
-eval v (List []) = (v, Just (List []))
-eval vars (List list) = do
-    case simpleEval vars (List list) of
-        Just value -> (vars, Just value)
-        Nothing -> complexEval vars (List list)
+eval v (List []) = return $ (v, (List []))
+eval vars (List list) = doEval vars (List list)
 
-simpleEval :: Variables -> Expression -> Maybe Expression
-simpleEval vars (List list@(h:hs)) = do
+doEval :: [Variables] -> Expression -> IO ([Variables], Expression)
+doEval vars (List list@(h:hs)) = do
     case h of
+        Operator "+" -> foldList vars hs (+)
+        Operator "*" -> foldList vars hs (*)
+        Operator "-" -> foldList vars hs (-)
+        Operator "/" -> foldList vars hs (/)
 
-        Operator "+" -> Just $ Number $ sum (map (evalAndGetNumber vars) hs)
-        Operator "*" -> Just $ Number $ product (map (evalAndGetNumber vars) hs)
-        Operator "-" -> Just $ Number $ foldl (-) (evalAndGetNumber vars $ head hs) (map (evalAndGetNumber vars) (tail hs))
-        Operator "/" -> Just $ Number $ foldl (/) (evalAndGetNumber vars $ head hs) (map (evalAndGetNumber vars) (tail hs))
+        Operator ">" -> foldCompareList vars hs (>)
+        Operator ">=" -> foldCompareList vars hs (>=)
+        Operator "<" -> foldCompareList vars hs (<)
+        Operator "<=" -> foldCompareList vars hs (<=)
+        Operator "=" -> foldCompareList vars hs (==)
 
-        Operator ">" -> Just $ Boolean $ compareList vars (>) hs
-        Operator ">=" -> Just $ Boolean $ compareList vars (>=) hs
-        Operator "<" -> Just $ Boolean $ compareList vars (<) hs
-        Operator "<=" -> Just $ Boolean $ compareList vars (<=) hs
-        Operator "=" -> Just $ Boolean $ compareList vars (==) hs
+        Symbol "number?" -> return $ (vars, checkValue maybeGetNumber hs)
+        Symbol "boolean?" -> return $ (vars, checkValue maybeGetBool hs)
 
-        Symbol "number?" -> checkValue maybeGetNumber hs
-        Symbol "boolean?" -> checkValue maybeGetBool hs
+        Symbol "max" -> foldList vars hs max
+        Symbol "min" -> foldList vars hs min
 
-        Symbol "max" -> Just $ Number $ foldl max (evalAndGetNumber vars $ head hs) (map (evalAndGetNumber vars) (tail hs))
-        Symbol "min" -> Just $ Number $ foldl min (evalAndGetNumber vars $ head hs) (map (evalAndGetNumber vars) (tail hs))
-        Symbol "abs" -> if length hs > 1 then Nothing else do
-            let num = maybeGetNumber $ head hs
-            case num of
-                Nothing -> Nothing
-                Just n -> Just $ Number (abs n)
-
-        Symbol "not" -> if length hs > 1 then Nothing else do
-            let bool = maybeGetBool $ head hs
-            case bool of
-                Nothing -> Just $ Boolean False
-                Just b -> Just $ Boolean (not b)
+        Symbol "abs" -> evalAbs vars hs
+        Symbol "not" -> evalNot vars hs
 
         Symbol "and" -> checkBoolList vars hs True
         Symbol "or" -> checkBoolList vars hs False
 
-        Symbol "lambda" -> Just $ Lambda list
+        Symbol "lambda" -> return $ (vars, Lambda (h, hs))
 
-        Symbol "set-car!" -> Nothing
-        Symbol "set-cdr!" -> Nothing
-        Symbol "car" -> Nothing
-        Symbol "cdr" -> Nothing
-        Symbol "define" -> Nothing
-        Symbol "set!" -> Nothing
-        Symbol "if" -> Nothing
-
-        Symbol _ -> evalSymbol vars (List list)
-
-        _ -> Nothing
-simpleEval _ _ = Nothing
-
-complexEval :: Variables -> Expression -> (Variables, Maybe Expression)
-complexEval vars (List (h:hs)) = do
-    case h of
-        Symbol "define" -> if not $ length hs == 2 then (vars, Nothing) else do
+        Symbol "define" -> if not $ length hs == 2 then error "" else do
             let name = getSymbol $ head hs
-            case snd $ eval vars (hs!!1) of
-                Nothing -> (vars, Nothing)
-                Just value -> (insert name value vars, Just value)
+            (_, evaled) <- eval vars (hs!!1)
+            return (defineVariable vars name evaled, evaled)
 
-        Symbol "set!" -> if not $ length hs == 2 then (vars, Nothing) else do
+        Symbol "set!" -> if not $ length hs == 2 then error "" else do
             let name = getSymbol $ head hs
 
-            case Data.Map.lookup name vars of
+            case lookupVariable vars name of
                 Just _ -> do
-                    case snd $ eval vars (hs!!1) of
-                        Nothing -> (vars, Nothing)
-                        Just value -> (insert name value vars, Just value)
-                Nothing -> (vars, Nothing)
+                    (_, evaled) <- eval vars (hs!!1)
+                    return (setVariable vars name evaled, evaled)
+                Nothing -> error "unknown name"
 
         Symbol "set-car!" -> do
             let name = getSymbol (head hs)
-            case Data.Map.lookup name vars of
-                Nothing -> (vars, Nothing)
+            case lookupVariable vars name of
+                Nothing -> error "unknown name"
                 Just val -> case val of
                     List (_:ls) -> do
-                        case snd $ eval vars (hs!!1) of
-                            Nothing -> (vars, Nothing)
-                            Just evaled -> do
-                                let newList = List (evaled : ls)
-                                let newVars = insert name newList (delete name vars)
-                                (newVars, Just evaled)
-                    _ -> (vars, Nothing)
+                        (_, evaled) <- eval vars (hs!!1)
+                        let newList = List (evaled : ls)
+                        let newVars = setVariable vars name newList
+                        return (newVars, evaled)
+                    _ -> error ""
 
         Symbol "car" -> do
-            let (newVars, evaled) = eval vars (head hs)
+            (newVars, evaled) <- eval vars (head hs)
             case evaled of
-                Nothing -> (newVars, Nothing)
-                Just value -> case value of
-                    List (l:_) -> (newVars, Just l)
-                    _ -> (newVars, Nothing)
+                List (l:_) -> return (newVars, l)
+                _ -> error ""
 
         Symbol "set-cdr!" -> do
             let name = getSymbol (head hs)
-            case Data.Map.lookup name vars of
-                Nothing -> (vars, Nothing)
+            case lookupVariable vars name of
+                Nothing -> error "unknown name"
                 Just val -> case val of
                     List (l:_) -> do
-                        case snd $ eval vars (hs!!1) of
-                            Nothing -> (vars, Nothing)
-                            Just evaled -> do
-                                let newList = List [l, evaled]
-                                let newVars = insert name newList (delete name vars)
-                                (newVars, Just evaled)
-                    _ -> (vars, Nothing)
+                        (_, evaled) <- eval vars (hs!!1)
+                        let newList = List [l, evaled]
+                        let newVars = setVariable vars name newList
+                        return (newVars, evaled)
+                    _ -> error ""
 
         Symbol "cdr" -> do
-            let (newVars, evaled) = eval vars (head hs)
+            (newVars, evaled) <- eval vars (head hs)
             case evaled of
-                Nothing -> (newVars, Nothing)
-                Just value -> case value of
-                    List (_:ls) -> (newVars, Just (head ls))
-                    _ -> (newVars, Nothing)
+                List (_:l:_) -> return (newVars, l)
+                _ -> error ""
 
-        Symbol "if" -> if not $ length hs == 3 then (vars, Nothing) else do
-            let (newVars, cond) = eval vars (head hs)
-            case cond of
-                Nothing -> (newVars, Nothing)
-                Just cond' -> do
-                    let passed = case cond' of
-                            Boolean bool -> bool
-                            _ -> True
+        Symbol "if" -> if not $ length hs == 3 then error "" else do
+            (newVars, cond) <- eval vars (head hs)
+            let passed = case cond of
+                    Boolean bool -> bool
+                    _ -> True
 
-                    if passed
-                        then eval newVars (hs!!1)
-                        else eval newVars (hs!!2)
+            if passed
+                then eval newVars (hs!!1)
+                else eval newVars (hs!!2)
 
-        _ -> (vars, Nothing)
-complexEval vars _ = (vars, Nothing)
+        Symbol _ -> evalSymbol vars (List list)
 
-evalSymbol :: Variables -> Expression -> Maybe Expression
+        _ -> error ""
+doEval _ _ = error ""
+
+evalSymbol :: [Variables] -> Expression -> IO ([Variables], Expression)
 evalSymbol vars (List (h:hs)) = do
     -- h – name, hs – params to call
-    let value = Data.Map.lookup (getSymbol h) vars
-    case value of
-        Nothing -> Nothing
+    case lookupVariable vars (getSymbol h) of
+        Nothing -> error "unknown name"
         Just val -> case val of
-            Lambda (_:lhs) -> do
-                let vars' = fillParamsInFunction vars (head lhs) hs
-                snd $ evalLines vars' (tail lhs)
-            _ -> value
-evalSymbol _ _ = Nothing
+            Lambda (_, lh:lhs) -> do
+                vars' <- fillParamsInFunction (initVar : vars) lh hs
+                (evaledV, expr) <- evalLines vars' lhs
+                return ((tail evaledV), expr)
+            _ -> return (vars, val)
+evalSymbol _ _ = error ""

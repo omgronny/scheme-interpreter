@@ -7,44 +7,36 @@ import Types
 main :: IO ()
 main = runTestTTAndExit tests
 
-evaluateProgram :: Variables -> String -> (Variables, Maybe String)
+evaluateProgram :: [Variables] -> String -> IO ([Variables], Maybe String)
 evaluateProgram vars input = do
   case parse pForm "(source)" input of
     Left _ -> do
-      (vars, Nothing)
+      return $ (vars, Nothing)
     Right form -> do
-      let (vars', ev) = eval vars form
-      case ev of
-        Nothing -> (vars', Nothing)
-        Just evaluated -> (vars', Just $ show evaluated)
+      (vars', ev) <- eval vars form
+      return $ (vars', Just $ show ev)
 
-checkEquals :: Variables -> String -> String -> IO Variables
+checkEquals :: [Variables] -> String -> String -> IO [Variables]
 checkEquals vars input expected = do
-  let (vars', evaluated) = evaluateProgram vars input
+  (vars', evaluated) <- evaluateProgram vars input
   assertEqual "" (Just expected) evaluated
-  return vars'
-
-checkNothing :: Variables -> String -> IO Variables
-checkNothing vars input = do
-  let (vars', evaluated) = evaluateProgram vars input
-  assertEqual "" Nothing evaluated
   return vars'
 
 tests :: Test
 tests =
   TestList
-    [ TestLabel "linear: test simple number" test1,
-      TestLabel "linear: test simple bool" test2,
-      TestLabel "linear: test list numbers" test3,
-      TestLabel "linear: test list order" test4,
-      TestLabel "linear: test list bool func" test5,
-      TestLabel "linear: test define" test6,
-      TestLabel "linear: test laziness" test7,
-      TestLabel "linear: test quote" test8,
-      TestLabel "linear: test lambda" test9,
-      TestLabel "linear: test car-cdr" test10,
-      TestLabel "linear: test control flow" test11,
-      TestLabel "linear: test recursive" test12
+    [ TestLabel "test simple number" test1,
+      TestLabel "test simple bool" test2,
+      TestLabel "test list numbers" test3,
+      TestLabel "test list order" test4,
+      TestLabel "test list bool func" test5,
+      TestLabel "test define" test6,
+      TestLabel "test laziness" test7,
+      TestLabel "test quote" test8,
+      TestLabel "test lambda" test9,
+      TestLabel "test car-cdr" test10,
+      TestLabel "test control flow" test11,
+      TestLabel "test recursive" test12
     ]
 
 test1 :: Test
